@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <h1>Admin Dashboard</h1>
+
+    <button onclick="showUpload()">Upload Images</button>
+    <button onclick="showGallery()">Gallery</button>
+
+    <hr>
+
+    <!-- Upload Section -->
+    <div id="uploadSection" style="display:none;">
+        <h3>Upload Event Photos</h3>
+
+        <input type="text" id="event" placeholder="Event name"><br><br>
+        <input type="file" id="file"><br><br>
+        <button onclick="uploadPhoto()">Upload Photo</button>
+
+        <p id="uploadResult"></p>
+    </div>
+
+    <!-- Gallery Section -->
+    <div id="gallerySection" style="display:none;">
+        <h3>View Event Gallery</h3>
+
+        <select id="eventSelect">
+            <option value="">-- Select Event --</option>
+        </select>
+
+        <br><br>
+        <button onclick="loadPhotos()">View Photos</button>
+
+        <p id="galleryMessage"></p>
+        <div id="gallery"></div>
+    </div>
+    <hr>
+    <h3>Delete Requests</h3>
+    <button onclick="loadDeleteRequests()">Load Delete Requests</button>
+
+    <div id="deleteRequests"></div>
+
+
+    <br><br>
+    <button onclick="logout()">Logout</button>
+
+    <script>
+        function showUpload() {
+            document.getElementById("uploadSection").style.display = "block";
+            document.getElementById("gallerySection").style.display = "none";
+        }
+
+        function showGallery() {
+            document.getElementById("gallerySection").style.display = "block";
+            document.getElementById("uploadSection").style.display = "none";
+            loadEvents();
+        }
+
+        function logout() {
+            window.location.href = "index.html";
+        }
+        // Load events for gallery dropdown
+        function loadEvents() {
+            const dropdown = document.getElementById("eventSelect");
+            dropdown.innerHTML = '<option value="">-- Select Event --</option>';
+
+            fetch("http://localhost:8080/events")
+                .then(response => response.json())
+                .then(events => {
+                    events.forEach(event => {
+                        const option = document.createElement("option");
+                        option.value = event;
+                        option.text = event;
+                        dropdown.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error(error);
+                    document.getElementById("galleryMessage").innerText = "Failed to load events";
+                });
+        }
+
+        // Upload photo
+        function uploadPhoto() {
+            const eventName = document.getElementById("event").value;
+            const fileInput = document.getElementById("file");
+            const result = document.getElementById("uploadResult");
+
+            if (eventName === "" || fileInput.files.length === 0) {
+                result.innerText = "Please enter event name and select a file";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("event", eventName);
+            formData.append("file", fileInput.files[0]);
+
+            fetch("http://localhost:8080/admin/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                result.innerText = data.message;
+                //document.getElementById("file").value = "";
+            })
+            .catch(error => {
+                console.error(error);
+                result.innerText = "Upload failed";
+            });
+        }
+
+        // Load photos for selected event
+        function loadPhotos() {
+            const eventName = document.getElementById("eventSelect").value;
+            const gallery = document.getElementById("gallery");
+            const message = document.getElementById("galleryMessage");
+
+            gallery.innerHTML = "";
+            message.innerText = "";
+
+            if (eventName === "") {
+                message.innerText = "Please select an event";
+                return;
+            }
+
+            fetch("http://localhost:8080/admin/photos/" + eventName)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        message.innerText = "No photos found";
+                        return;
+                    }
+
+                    data.forEach(url => {
+
+                    const container = document.createElement("div");
+                    container.style.display = "inline-block";
+                    container.style.margin = "10px";
+                    container.style.textAlign = "center";
+
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.width = 200;
+                    img.style.display = "block";
+
+                    const downloadLink = document.createElement("a");
+                    downloadLink.href = url;
+                    downloadLink.innerText = "Download";
+                    downloadLink.download = "";
+                    downloadLink.style.display = "block";
+                    downloadLink.style.marginTop = "5px";
+
+                    container.appendChild(img);
+                    container.appendChild(downloadLink);
+
+                    gallery.appendChild(container);
+                });
+
+                })
+                .catch(error => {
+                    console.error(error);
+                    message.innerText = "Failed to load photos";
+                });
+        }
+
+        function loadDeleteRequests() {
+            fetch("http://localhost:8080/admin/delete-requests")
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById("deleteRequests");
+                    container.innerHTML = "";
+
+                    if (data.length === 0) {
+                        container.innerText = "No delete requests";
+                        return;
+                    }
+
+                    data.forEach(req => {
+                        const div = document.createElement("div");
+                        div.style.border = "1px solid #ccc";
+                        div.style.padding = "10px";
+                        div.style.margin = "10px";
+
+                        div.innerHTML = `
+                            <p><b>Event:</b> ${req.event}</p>
+                            <p><b>Image:</b> ${req.image}</p>
+                            <p><b>Reason:</b> ${req.reason}</p>
+                        `;
+
+                        const btn = document.createElement("button");
+                        btn.innerText = "Approve & Delete";
+                        btn.onclick = function () {
+                            approveDelete(req);
+                        };
+
+                        div.appendChild(btn);
+                        container.appendChild(div);
+                    });
+                });
+        }
+    
+        function approveDelete(req) {
+        fetch("http://localhost:8080/admin/approve-delete", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(req)
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            loadDeleteRequests(); // refresh list
+        });
+    }
+
+    </script>
+
+
+</body>
+</html>

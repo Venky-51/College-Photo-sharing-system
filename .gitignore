@@ -1,0 +1,15 @@
+# Java
+target/
+*.class
+
+# IDE files
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploaded images
+uploads/
